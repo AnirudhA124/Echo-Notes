@@ -2,7 +2,7 @@ package com.example.echonotes;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
-import android.media.MediaPlayer;
+import android.content.res.ColorStateList;
 import android.media.MediaRecorder;
 import android.os.Bundle;
 import android.os.Environment;
@@ -14,6 +14,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -31,6 +32,7 @@ import org.json.JSONObject;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
@@ -47,7 +49,6 @@ public class RecordFragment extends Fragment {
     private boolean isRecording = false;
 
     private MediaRecorder mediaRecorder;
-    private MediaPlayer mediaPlayer;
     private File audioFile;
     private String clientId;
 
@@ -62,10 +63,9 @@ public class RecordFragment extends Fragment {
         timerHandler.postDelayed(this.timerRunnable, 1000);
     };
 
-    // Server configuration - update with your actual server IP
     private static final String SERVER_URL = "http://192.168.46.197:5000/upload";
     private static final String TRANSCRIPT_URL = "http://192.168.46.197:5000/transcript/";
-    private static final int POLL_INTERVAL = 5000; // 5 seconds
+    private static final int POLL_INTERVAL = 5000;
     private Handler pollHandler = new Handler(Looper.getMainLooper());
 
     @Nullable
@@ -134,8 +134,7 @@ public class RecordFragment extends Fragment {
 
             Toast.makeText(getContext(), "Recording finished!", Toast.LENGTH_SHORT).show();
 
-            playRecording();  // Play audio
-            uploadRecording();  // Upload to server
+            uploadRecording();
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -143,26 +142,10 @@ public class RecordFragment extends Fragment {
         }
     }
 
-    private void playRecording() {
-        if (audioFile != null && audioFile.exists()) {
-            mediaPlayer = new MediaPlayer();
-            try {
-                mediaPlayer.setDataSource(audioFile.getAbsolutePath());
-                mediaPlayer.prepare();
-                mediaPlayer.start();
-                Toast.makeText(getContext(), "Playing recorded audio", Toast.LENGTH_SHORT).show();
-            } catch (IOException e) {
-                e.printStackTrace();
-                Toast.makeText(getContext(), "Playback failed", Toast.LENGTH_SHORT).show();
-            }
-        }
-    }
-
     private void uploadRecording() {
         new Thread(() -> {
             HttpURLConnection connection = null;
             try {
-                // Get the audio file data
                 if (audioFile == null || !audioFile.exists()) {
                     Log.e("UPLOAD", "Audio file doesn't exist");
                     requireActivity().runOnUiThread(() -> {
@@ -173,7 +156,6 @@ public class RecordFragment extends Fragment {
 
                 String boundary = "----" + System.currentTimeMillis();
 
-                // Setup connection
                 URL url = new URL(SERVER_URL);
                 connection = (HttpURLConnection) url.openConnection();
                 connection.setRequestMethod("POST");
@@ -182,23 +164,19 @@ public class RecordFragment extends Fragment {
                 connection.setRequestProperty("Connection", "Keep-Alive");
                 connection.setUseCaches(false);
 
-                // Create output stream
                 java.io.DataOutputStream outputStream = new java.io.DataOutputStream(connection.getOutputStream());
 
-                // Start multipart request
                 outputStream.writeBytes("--" + boundary + "\r\n");
                 outputStream.writeBytes("Content-Disposition: form-data; name=\"file\"; filename=\"" +
                         audioFile.getName() + "\"\r\n");
                 outputStream.writeBytes("Content-Type: audio/3gpp\r\n\r\n");
 
-                // Read file data
                 FileInputStream fileInputStream = new FileInputStream(audioFile);
                 int bytesAvailable = fileInputStream.available();
                 int maxBufferSize = 1024 * 1024;
                 int bufferSize = Math.min(bytesAvailable, maxBufferSize);
                 byte[] buffer = new byte[bufferSize];
 
-                // Read file
                 int bytesRead = fileInputStream.read(buffer, 0, bufferSize);
                 while (bytesRead > 0) {
                     outputStream.write(buffer, 0, bytesRead);
@@ -207,23 +185,19 @@ public class RecordFragment extends Fragment {
                     bytesRead = fileInputStream.read(buffer, 0, bufferSize);
                 }
 
-                // Send file metadata
                 outputStream.writeBytes("\r\n--" + boundary + "\r\n");
                 outputStream.writeBytes("Content-Disposition: form-data; name=\"metadata\"\r\n\r\n");
                 outputStream.writeBytes("{\"timestamp\":\"" + System.currentTimeMillis() + "\"}\r\n");
                 outputStream.writeBytes("--" + boundary + "--\r\n");
 
-                // Close streams
                 fileInputStream.close();
                 outputStream.flush();
                 outputStream.close();
 
-                // Get response
                 int responseCode = connection.getResponseCode();
                 Log.d("UPLOAD", "Server responded with: " + responseCode);
 
                 if (responseCode == 200) {
-                    // Read response
                     BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
                     String inputLine;
                     StringBuilder response = new StringBuilder();
@@ -232,7 +206,6 @@ public class RecordFragment extends Fragment {
                     }
                     in.close();
 
-                    // Parse response to get client ID
                     try {
                         JSONObject jsonResponse = new JSONObject(response.toString());
                         clientId = jsonResponse.getString("client_id");
@@ -242,7 +215,6 @@ public class RecordFragment extends Fragment {
                             Toast.makeText(getContext(), "Audio uploaded successfully", Toast.LENGTH_SHORT).show();
                         });
 
-                        // Start polling for transcript
                         startPollingForTranscript();
 
                     } catch (JSONException e) {
@@ -272,21 +244,24 @@ public class RecordFragment extends Fragment {
             return;
         }
 
-        // Show loading message in UI
         requireActivity().runOnUiThread(() -> {
-            // Clear previous transcripts
             transcriptContainer.removeAllViews();
 
-            // Add loading indicator
-            TextView loadingText = new TextView(getContext());
-            loadingText.setText("Processing transcript...");
-            loadingText.setPadding(16, 16, 16, 16);
-            loadingText.setTextColor(getResources().getColor(android.R.color.black));
-            loadingText.setTextSize(16);
-            transcriptContainer.addView(loadingText);
+            ProgressBar progressBar = new ProgressBar(getContext(), null, android.R.attr.progressBarStyleLarge);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+            );
+            params.setMargins(0, 50, 0, 0);
+            params.gravity = android.view.Gravity.CENTER;
+            progressBar.setLayoutParams(params);
+            progressBar.setIndeterminate(true);
+            progressBar.setIndeterminateTintList(
+                    ColorStateList.valueOf(ContextCompat.getColor(requireContext(), android.R.color.black))
+            );
+            transcriptContainer.addView(progressBar);
         });
 
-        // Start polling
         pollForTranscript();
     }
 
@@ -312,19 +287,16 @@ public class RecordFragment extends Fragment {
                     String status = jsonResponse.getString("status");
 
                     if ("completed".equals(status)) {
-                        // Process and display transcript
                         JSONArray transcript = jsonResponse.getJSONArray("transcript");
                         displayTranscript(transcript);
-                        return; // Done polling
+                        return;
                     }
                 }
 
-                // Schedule next poll
                 pollHandler.postDelayed(this::pollForTranscript, POLL_INTERVAL);
 
             } catch (Exception e) {
                 Log.e("TRANSCRIPT", "Error polling for transcript", e);
-                // Schedule retry
                 pollHandler.postDelayed(this::pollForTranscript, POLL_INTERVAL);
             }
         }).start();
@@ -333,43 +305,36 @@ public class RecordFragment extends Fragment {
     private void displayTranscript(JSONArray transcript) {
         requireActivity().runOnUiThread(() -> {
             try {
-                // Clear loading message
                 transcriptContainer.removeAllViews();
 
-                // Add each utterance
+                StringBuilder fullTranscript = new StringBuilder();
+
                 for (int i = 0; i < transcript.length(); i++) {
                     JSONObject utterance = transcript.getJSONObject(i);
                     String speaker = utterance.getString("speaker");
                     String text = utterance.getString("text");
 
-                    // Create a CardView for each utterance
+                    fullTranscript.append(speaker).append(": ").append(text).append("\n\n");
+
                     CardView cardView = new CardView(requireContext());
                     CardView.LayoutParams cardParams = new CardView.LayoutParams(
                             CardView.LayoutParams.MATCH_PARENT,
                             CardView.LayoutParams.WRAP_CONTENT
                     );
-                    cardParams.setMargins(0, 0, 0, 16); // bottom margin
+                    cardParams.setMargins(0, 0, 0, 16);
                     cardView.setLayoutParams(cardParams);
                     cardView.setRadius(12);
                     cardView.setCardElevation(4);
 
-                    // Determine background color based on speaker
-                    // Determine background color based on speaker
-                    int backgroundColor;
-                    if (speaker.endsWith("A")) {  // Speaker A/1
-                        backgroundColor = ContextCompat.getColor(requireContext(), android.R.color.holo_blue_light);
-                    } else {  // Speaker B/2
-                        backgroundColor = ContextCompat.getColor(requireContext(), android.R.color.holo_green_light);
-                    }
+                    int backgroundColor = speaker.endsWith("A") ?
+                            ContextCompat.getColor(requireContext(), android.R.color.darker_gray) :
+                            ContextCompat.getColor(requireContext(), android.R.color.white);
                     cardView.setCardBackgroundColor(backgroundColor);
 
-
-                    // Create content layout for the card
                     LinearLayout contentLayout = new LinearLayout(requireContext());
                     contentLayout.setOrientation(LinearLayout.VERTICAL);
                     contentLayout.setPadding(16, 16, 16, 16);
 
-                    // Create speaker label
                     TextView speakerText = new TextView(requireContext());
                     speakerText.setText(speaker);
                     speakerText.setTextSize(14);
@@ -377,7 +342,6 @@ public class RecordFragment extends Fragment {
                     speakerText.setTextColor(getResources().getColor(android.R.color.black));
                     contentLayout.addView(speakerText);
 
-                    // Create text content
                     TextView contentText = new TextView(requireContext());
                     contentText.setText(text);
                     contentText.setTextSize(16);
@@ -385,12 +349,31 @@ public class RecordFragment extends Fragment {
                     contentText.setPadding(0, 8, 0, 0);
                     contentLayout.addView(contentText);
 
-                    // Add the content layout to the card
                     cardView.addView(contentLayout);
-
-                    // Add the card to the transcript container
                     transcriptContainer.addView(cardView);
                 }
+
+                Button downloadButton = new Button(requireContext());
+                downloadButton.setText("Download Transcript");
+                downloadButton.setOnClickListener(v -> {
+                    try {
+                        File downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+                        if (!downloadsDir.exists()) downloadsDir.mkdirs();
+
+                        File transcriptFile = new File(downloadsDir, "transcript.txt");
+                        FileOutputStream fos = new FileOutputStream(transcriptFile);
+                        fos.write(fullTranscript.toString().getBytes());
+                        fos.close();
+
+                        Log.d("TRANSCRIPT", "Transcript saved to: " + transcriptFile.getAbsolutePath());
+                        Toast.makeText(getContext(), "Transcript saved to: " + transcriptFile.getAbsolutePath(), Toast.LENGTH_LONG).show();
+                    } catch (IOException e) {
+                        Toast.makeText(getContext(), "Failed to save transcript", Toast.LENGTH_SHORT).show();
+                        Log.e("TRANSCRIPT", "Error saving file", e);
+                    }
+                });
+
+                transcriptContainer.addView(downloadButton);
 
                 Toast.makeText(getContext(), "Transcript ready!", Toast.LENGTH_SHORT).show();
 
@@ -421,12 +404,6 @@ public class RecordFragment extends Fragment {
             mediaRecorder = null;
         }
 
-        if (mediaPlayer != null) {
-            mediaPlayer.release();
-            mediaPlayer = null;
-        }
-
-        // Cancel polling if active
         pollHandler.removeCallbacksAndMessages(null);
     }
 }
