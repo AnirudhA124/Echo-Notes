@@ -63,8 +63,8 @@ public class RecordFragment extends Fragment {
         timerHandler.postDelayed(this.timerRunnable, 1000);
     };
 
-    private static final String SERVER_URL = "http://192.168.46.197:5000/upload";
-    private static final String TRANSCRIPT_URL = "http://192.168.46.197:5000/transcript/";
+    private static final String SERVER_URL = "https://transcript-api-bouw.onrender.com/upload";
+    private static final String TRANSCRIPT_URL = "https://transcript-api-bouw.onrender.com/transcript/";
     private static final int POLL_INTERVAL = 5000;
     private Handler pollHandler = new Handler(Looper.getMainLooper());
 
