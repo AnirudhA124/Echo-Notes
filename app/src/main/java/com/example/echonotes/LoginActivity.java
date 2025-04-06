@@ -8,6 +8,7 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -50,6 +51,12 @@ public class LoginActivity extends AppCompatActivity {
             }
         });
 
+        TextView signupText = findViewById(R.id.signup_text);
+        signupText.setOnClickListener(view -> {
+            Intent intent = new Intent(LoginActivity.this, SignupActivity.class);
+            startActivity(intent);
+        });
+
         // Login button with Firebase Authentication
         loginButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -65,6 +72,7 @@ public class LoginActivity extends AppCompatActivity {
             }
         });
     }
+
 
     private void loginUser(String email, String password) {
         auth.signInWithEmailAndPassword(email, password)

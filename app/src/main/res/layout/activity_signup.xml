@@ -34,9 +34,23 @@
 
     <!-- Email Input Field -->
     <EditText
+        android:id="@+id/name"
+        android:layout_width="match_parent"
+        android:layout_height="50dp"
+
+        android:background="@drawable/edit_text_bg"
+        android:hint="Full Name"
+        android:inputType="textPersonName"
+        android:padding="12dp"
+        android:textColor="@color/black"
+        android:textCursorDrawable="@null"
+        android:textSize="16sp" />
+
+    <EditText
         android:id="@+id/email"
         android:layout_width="match_parent"
         android:layout_height="50dp"
+        android:layout_marginTop="12dp"
         android:background="@drawable/edit_text_bg"
         android:hint="Email"
         android:inputType="textEmailAddress"
