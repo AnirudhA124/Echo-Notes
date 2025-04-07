@@ -21,8 +21,7 @@
             app:cardElevation="6dp"
             app:cardBackgroundColor="@android:color/white">
 
-
-        <LinearLayout
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
@@ -35,16 +34,15 @@
                     android:src="@drawable/ic_mic"
                     app:tint="@color/black" />
 
-            <TextView
-                android:id="@+id/timer_view"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="00:00"
-                android:textSize="24sp"
-                android:paddingTop="10dp" />
+                <TextView
+                    android:id="@+id/timer_view"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="00:00"
+                    android:textSize="24sp"
+                    android:paddingTop="10dp" />
 
-
-            <Button
+                <Button
                     android:id="@+id/start_recording"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
@@ -55,6 +53,22 @@
 
             </LinearLayout>
         </androidx.cardview.widget.CardView>
+
+        <!-- SUMMARY SECTION -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Summary"
+            android:textSize="18sp"
+            android:layout_marginBottom="8dp" />
+
+        <LinearLayout
+            android:id="@+id/summary_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginBottom="20dp"
+            />
 
         <!-- TRANSCRIPT SECTION -->
         <TextView

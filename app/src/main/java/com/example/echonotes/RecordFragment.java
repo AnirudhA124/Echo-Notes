@@ -43,6 +43,7 @@ import java.util.Locale;
 
 public class RecordFragment extends Fragment {
 
+    private LinearLayout summaryContainer;
     private LinearLayout transcriptContainer;
     private Button recordButton;
     private TextView timerTextView;
@@ -63,8 +64,8 @@ public class RecordFragment extends Fragment {
         timerHandler.postDelayed(this.timerRunnable, 1000);
     };
 
-    private static final String SERVER_URL = "https://transcript-api-bouw.onrender.com/upload";
-    private static final String TRANSCRIPT_URL = "https://transcript-api-bouw.onrender.com/transcript/";
+    private static final String SERVER_URL = "http://192.168.46.197:5000/upload";
+    private static final String TRANSCRIPT_URL = "http://192.168.46.197:5000/transcript/";
     private static final int POLL_INTERVAL = 5000;
     private Handler pollHandler = new Handler(Looper.getMainLooper());
 
@@ -72,7 +73,7 @@ public class RecordFragment extends Fragment {
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_record, container, false);
-
+        summaryContainer =view.findViewById(R.id.summary_container);
         transcriptContainer = view.findViewById(R.id.transcript_container);
         recordButton = view.findViewById(R.id.start_recording);
         timerTextView = view.findViewById(R.id.timer_view);
@@ -216,6 +217,7 @@ public class RecordFragment extends Fragment {
                         });
 
                         startPollingForTranscript();
+                        startPollingForSummary();
 
                     } catch (JSONException e) {
                         Log.e("UPLOAD", "Failed to parse response", e);
@@ -236,6 +238,32 @@ public class RecordFragment extends Fragment {
                 }
             }
         }).start();
+    }
+    private void startPollingForSummary() {
+        if (clientId == null || clientId.isEmpty()) {
+            Log.e("SUMMARY", "No client ID available");
+            return;
+        }
+
+        requireActivity().runOnUiThread(() -> {
+            summaryContainer.removeAllViews();
+
+            ProgressBar progressBar = new ProgressBar(getContext(), null, android.R.attr.progressBarStyleLarge);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+            );
+            params.setMargins(0, 50, 0, 0);
+            params.gravity = android.view.Gravity.CENTER;
+            progressBar.setLayoutParams(params);
+            progressBar.setIndeterminate(true);
+            progressBar.setIndeterminateTintList(
+                    ColorStateList.valueOf(ContextCompat.getColor(requireContext(), android.R.color.black))
+            );
+            summaryContainer.addView(progressBar);
+        });
+
+        pollForTranscript(); // polling transcript gives both transcript & summary
     }
 
     private void startPollingForTranscript() {
@@ -288,7 +316,12 @@ public class RecordFragment extends Fragment {
 
                     if ("completed".equals(status)) {
                         JSONArray transcript = jsonResponse.getJSONArray("transcript");
-                        displayTranscript(transcript);
+                        String summary = jsonResponse.getString("summary");
+
+                        requireActivity().runOnUiThread(() -> {
+                            displayTranscript(transcript);
+                            displaySummary(summary);
+                        });
                         return;
                     }
                 }
@@ -301,6 +334,7 @@ public class RecordFragment extends Fragment {
             }
         }).start();
     }
+
 
     private void displayTranscript(JSONArray transcript) {
         requireActivity().runOnUiThread(() -> {
@@ -383,6 +417,93 @@ public class RecordFragment extends Fragment {
             }
         });
     }
+
+
+
+
+    private void displaySummary(String summary) {
+        requireActivity().runOnUiThread(() -> {
+            try {
+                summaryContainer.removeAllViews();
+
+                // Show spinner while loading
+                ProgressBar spinner = new ProgressBar(requireContext());
+                spinner.setIndeterminate(true);
+                summaryContainer.addView(spinner);
+
+                // Simulate slight delay for UX (optional)
+                new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                    summaryContainer.removeAllViews(); // remove spinner
+
+                    // Create CardView for summary
+                    CardView cardView = new CardView(requireContext());
+                    CardView.LayoutParams cardParams = new CardView.LayoutParams(
+                            CardView.LayoutParams.MATCH_PARENT,
+                            CardView.LayoutParams.WRAP_CONTENT
+                    );
+                    cardParams.setMargins(0, 0, 0, 16);
+                    cardView.setLayoutParams(cardParams);
+                    cardView.setRadius(12);
+                    cardView.setCardElevation(4);
+                    cardView.setCardBackgroundColor(ContextCompat.getColor(requireContext(), android.R.color.darker_gray));
+
+                    // Content inside CardView
+                    LinearLayout contentLayout = new LinearLayout(requireContext());
+                    contentLayout.setOrientation(LinearLayout.VERTICAL);
+                    contentLayout.setPadding(16, 16, 16, 16);
+
+                    TextView titleText = new TextView(requireContext());
+                    titleText.setText("Summary");
+                    titleText.setTextSize(16);
+                    titleText.setTypeface(null, android.graphics.Typeface.BOLD);
+                    titleText.setTextColor(getResources().getColor(android.R.color.white));
+                    contentLayout.addView(titleText);
+
+                    TextView summaryText = new TextView(requireContext());
+                    summaryText.setText(summary);
+                    summaryText.setTextSize(16);
+                    summaryText.setTextColor(getResources().getColor(android.R.color.white));
+                    summaryText.setPadding(0, 8, 0, 0);
+                    contentLayout.addView(summaryText);
+
+                    cardView.addView(contentLayout);
+                    summaryContainer.addView(cardView);
+
+                    // Download button
+                    Button downloadButton = new Button(requireContext());
+                    downloadButton.setText("Download Summary");
+                    downloadButton.setOnClickListener(v -> {
+                        try {
+                            File internalDir = requireContext().getExternalFilesDir(null); // /Android/data/your.package.name/files
+                            if (internalDir == null) throw new IOException("Internal directory not accessible");
+
+                            File summaryFile = new File(internalDir, "summary.txt");
+                            FileOutputStream fos = new FileOutputStream(summaryFile);
+                            fos.write(summary.getBytes());
+                            fos.close();
+
+                            Log.d("SUMMARY", "Summary saved to: " + summaryFile.getAbsolutePath());
+                            Toast.makeText(getContext(), "Summary saved to: " + summaryFile.getAbsolutePath(), Toast.LENGTH_LONG).show();
+                        } catch (IOException e) {
+                            Toast.makeText(getContext(), "Failed to save summary", Toast.LENGTH_SHORT).show();
+                            Log.e("SUMMARY", "Error saving summary", e);
+                        }
+                    });
+
+
+                    summaryContainer.addView(downloadButton);
+                    Toast.makeText(getContext(), "Summary ready!", Toast.LENGTH_SHORT).show();
+
+                }, 500); // Delay of 500ms for visual effect (optional)
+
+            } catch (Exception e) {
+                Log.e("SUMMARY", "Error displaying summary", e);
+                Toast.makeText(getContext(), "Error displaying summary", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
