@@ -19,7 +19,7 @@ public class TabPagerAdapter extends FragmentPagerAdapter {
             case 0:
                 return new RecordFragment();
             case 1:
-                return new GroupsFragment();
+                return new GroupFragment();
             default:
                 return new RecordFragment();
         }
