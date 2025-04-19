@@ -67,7 +67,7 @@ public class RecordFragment extends Fragment {
     private static final String SERVER_URL = "https://transcript-api-bouw.onrender.com/upload";
     private static final String TRANSCRIPT_URL = "https://transcript-api-bouw.onrender.com/transcript/";
     private static final int POLL_INTERVAL = 5000;
-    private Handler pollHandler = new Handler(Looper.getMainLooper());
+    private Handler pollHandler = new Handler(Looper.getMainLooper());t
 
     @Nullable
     @Override
